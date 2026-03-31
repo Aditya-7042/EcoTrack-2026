@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>EcoTrack 2026 | Carbon Auditor</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="dashboard">
+        <header>
+            <h1>EcoTrack <span>v1.0</span></h1>
+            <div id="status-badge">System: Nominal</div>
+        </header>
+
+        <section class="stats-grid">
+            <div class="card">
+                <h3>Data Transferred</h3>
+                <p id="data-val">0.00 MB</p>
+            </div>
+            <div class="card">
+                <h3>CPU Pressure</h3>
+                <p id="cpu-val">Checking...</p>
+            </div>
+            <div class="card accent">
+                <h3>Est. Carbon Impact</h3>
+                <p id="carbon-val">0.00 mg CO₂</p>
+            </div>
+        </section>
+
+        <div class="visualizer">
+            <canvas id="loadChart"></canvas>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
