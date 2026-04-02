@@ -1,72 +1,63 @@
-// --- 1. GLOBAL VARIABLES ---
-const KWH_PER_GB = 0.06;      
-const CARBON_INTENSITY = 475; 
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-analytics.js";
+import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyCjJr9RfRARGbEOucL5-8EU6b-o-dtZxyg",
+    authDomain: "ecotrack-a8cc2.firebaseapp.com",
+    projectId: "ecotrack-a8cc2",
+    storageBucket: "ecotrack-a8cc2.firebasestorage.app",
+    messagingSenderId: "972183035152",
+    appId: "1:972183035152:web:f41f1e1c7d673176f51995",
+    measurementId: "G-W282276SN8"
+};
+
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+const db = getDatabase(app);
+const dbRef = ref(db, "ecoData");
+
 let totalBytes = 0;
+let carbonMg = 0;
+const KWH_PER_GB = 0.06;
+const CARBON_INTENSITY = 475;
+let intervalId;
 
-// --- 2. THE IMPROVED AUDITOR ENGINE ---
-function initAuditor() {
-    // Check history (Catch CSS/JS/HTML already loaded)
-    performance.getEntriesByType('resource').forEach(entry => {
-        // Fix: Some browsers report 0 for transferSize on localhost
-        // so we check encodedBodySize and decodedBodySize as well
-        const size = entry.transferSize || entry.encodedBodySize || entry.decodedBodySize || 0;
-        totalBytes += size;
-    });
-
-    // Listen for new movement (Images, Fetch calls, etc.)
-    const observer = new PerformanceObserver((list) => {
-        list.getEntries().forEach((entry) => {
-            const size = entry.transferSize || entry.encodedBodySize || entry.decodedBodySize || 0;
-            if (size > 0) {
-                totalBytes += size;
-                updateDisplay(); 
-            }
-        });
-    });
-    
-    observer.observe({ type: 'resource', buffered: true });
-    updateDisplay(); // Initial UI update
+function resetUI() {
+    totalBytes = 0;
+    carbonMg = 0;
+    document.getElementById('data-val').innerText = '0.00 MB';
+    document.getElementById('carbon-val').innerText = '0.00 mg CO₂';
 }
+resetUI();
 
-// --- 3. THE UI UPDATE LOGIC ---
 function updateDisplay() {
-    // Convert Bytes to MB
     const mb = totalBytes / (1024 * 1024);
-    const dataDisplay = document.getElementById('data-val');
-    
-    if (dataDisplay) {
-        dataDisplay.innerText = `${mb.toFixed(2)} MB`;
-    }
-
-    // Carbon Calculation
     const gb = totalBytes / (1024 * 1024 * 1024);
-    const carbonMg = gb * KWH_PER_GB * CARBON_INTENSITY * 1000;
-    
-    const carbonDisplay = document.getElementById('carbon-val');
-    if (carbonDisplay) {
-        carbonDisplay.innerText = `${carbonMg.toFixed(2)} mg CO₂`;
-    }
+    carbonMg = gb * KWH_PER_GB * CARBON_INTENSITY * 1000;
+
+    document.getElementById('data-val').innerText = `${mb.toFixed(2)} MB`;
+    document.getElementById('carbon-val').innerText = `${carbonMg.toFixed(2)} mg CO₂`;
+
+    set(dbRef, { totalBytes: totalBytes, carbonImpact: carbonMg });
 }
 
-// --- 4. CPU MONITOR (Compute Pressure) ---
-if ('PressureObserver' in window) {
-    const pressureObserver = new PressureObserver((changes) => {
-        const latest = changes[0];
-        const cpuDisplay = document.getElementById('cpu-val');
-        if (cpuDisplay) cpuDisplay.innerText = latest.state.toUpperCase();
-        
-        const badge = document.getElementById('status-badge');
-        if (badge) badge.style.color = latest.state === 'critical' ? '#ff4444' : '#00ff88';
-    });
-    pressureObserver.observe('cpu');
+function startSimulation() {
+    if(intervalId) return;
+    intervalId = setInterval(() => {
+        const img = new Image();
+        img.src = `https://picsum.photos/200/200?random=${Math.floor(Math.random()*10000)}&t=${Date.now()}`;
+        img.onload = () => {
+            totalBytes += 50*100 * 3;
+            updateDisplay();
+        };
+    }, 1000);
 }
 
-// --- 5. EXECUTION ---
-initAuditor();
+function stopSimulation() {
+    clearInterval(intervalId);
+    intervalId = null;
+}
 
-// --- 6. AUTO-TEST (Forces movement after 1.5 seconds) ---
-setTimeout(() => {
-    console.log("Running auto-test fetch...");
-    fetch('https://jsonplaceholder.typicode.com/photos?_limit=20')
-        .then(() => console.log("Test data fetched! Check the UI."));
-}, 1500);
+document.getElementById("start-btn").onclick = startSimulation;
+document.getElementById("stop-btn").onclick = stopSimulation;
