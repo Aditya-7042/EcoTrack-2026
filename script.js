@@ -118,21 +118,30 @@ if (!isSimulation) {
     // -- Wait for page to fully load, then audit ONCE --
     window.addEventListener('load', () => {
         setTimeout(() => {
-            if (auditDone) return; // safety guard
+            if (auditDone) return; // safety guard — never runs twice
             auditDone = true;
 
+            // FIX: Use decodedBodySize as fallback when transferSize is 0
+            // transferSize = 0 means browser loaded from cache (304 Not Modified)
+            // decodedBodySize = actual size of the resource regardless of cache
             const entries = performance.getEntriesByType("resource");
             entries.forEach((entry) => {
                 if (entry.name.includes('/api/audit')) return;
-                if (entry.transferSize > 0) {
-                    totalBytes += entry.transferSize;
+                const size = entry.transferSize > 0
+                    ? entry.transferSize      // fresh load — real wire bytes
+                    : entry.decodedBodySize;  // cached load — uncompressed size
+                if (size > 0) {
+                    totalBytes += size;
                 }
             });
 
             // Also include the main HTML document itself
             const navEntry = performance.getEntriesByType("navigation")[0];
-            if (navEntry && navEntry.transferSize > 0) {
-                totalBytes += navEntry.transferSize;
+            if (navEntry) {
+                const navSize = navEntry.transferSize > 0
+                    ? navEntry.transferSize
+                    : navEntry.decodedBodySize;
+                if (navSize > 0) totalBytes += navSize;
             }
 
             updateUI(totalBytes);
@@ -156,7 +165,7 @@ function startSimulation() {
         const img = new Image();
         img.src = `https://picsum.photos/200/200?random=${Math.floor(Math.random() * 10000)}&t=${Date.now()}`;
         img.onload = () => {
-            totalBytes += 150 * 1024;
+            totalBytes += 150 * 1024; // ~150 KB per image load
             updateUI(totalBytes);
         };
     }, 2000);
