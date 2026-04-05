@@ -87,20 +87,27 @@ async function updateUI(bytes) {
 if (!isSimulation) {
     // -- Real network tracking --
     try {
-        const netObserver = new PerformanceObserver((list) => {
-            list.getEntries().forEach((entry) => {
-                if (entry.transferSize > 0) {
-                    totalBytes += entry.transferSize;
-                    updateUI(totalBytes);
-                }
-            });
+    let debounceTimer = null;
+
+    const netObserver = new PerformanceObserver((list) => {
+        list.getEntries().forEach((entry) => {
+            if (entry.name.includes('/api/audit')) return;
+            if (entry.transferSize > 0) {
+                totalBytes += entry.transferSize;
+            }
         });
-        // buffered:true picks up resources loaded before observer attached
-        netObserver.observe({ type: "resource", buffered: true });
-    } catch (e) {
-        console.warn("PerformanceObserver not supported:", e);
-        document.getElementById('data-val').innerText = "Not supported";
-    }
+
+        // Wait 1 second after last resource before calling API
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            updateUI(totalBytes);
+        }, 1000);
+    });
+    netObserver.observe({ type: "resource", buffered: true });
+} catch (e) {
+    console.warn("PerformanceObserver not supported:", e);
+    document.getElementById('data-val').innerText = "Not supported";
+}
 
     // -- Real CPU pressure tracking --
     if ('PressureObserver' in window) {
