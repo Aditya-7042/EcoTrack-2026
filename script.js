@@ -31,16 +31,29 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/fireba
   }
   resetUI();
 
-  function updateDisplay() {
-      const mb = totalBytes / (1024 * 1024);
-      const gb = totalBytes / (1024 * 1024 * 1024);
-      carbonMg = gb * KWH_PER_GB * CARBON_INTENSITY * 1000;
+  async function updateUI(bytes) {
+    // 1. Fetch calculation from your Node.js Backend
+    const response = await fetch('/api/audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bytes: bytes })
+    });
+    
+    const result = await response.json();
+    const carbonMg = result.carbonMg; // Received from Node.js
+    const mb = bytes / (1024 * 1024);
 
-      document.getElementById('data-val').innerText = `${mb.toFixed(2)} MB`;
-      document.getElementById('carbon-val').innerText = `${carbonMg.toFixed(2)} mg CO₂`;
+    // 2. Update the Screen
+    document.getElementById('data-val').innerText = mb.toFixed(2) + " MB";
+    document.getElementById('carbon-val').innerText = carbonMg + " mg";
 
-      set(dbRef, { totalBytes: totalBytes, carbonImpact: carbonMg });
-  }
+    // 3. Sync to Firebase
+    set(ref(db, 'live_audit/' + sessionId), {
+        mb_transferred: mb.toFixed(2),
+        carbon_mg: carbonMg,
+        timestamp: Date.now()
+    });
+}
 
   function startSimulation() {
       if(intervalId) return;
