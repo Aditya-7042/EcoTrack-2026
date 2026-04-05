@@ -1,99 +1,168 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-analytics.js";
 import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
 
+// ============================================================
+//  MASTER TOGGLE
+//  true  → Simulation mode (fake image loads, demo buttons work)
+//  false → Real mode      (PerformanceObserver + PressureObserver)
+// ============================================================
+const isSimulation = false;
+
+// --- Firebase Setup ---
 const firebaseConfig = {
     apiKey: "AIzaSyCjJr9RfRARGbEOucL5-8EU6b-o-dtZxyg",
     authDomain: "ecotrack-a8cc2.firebaseapp.com",
     projectId: "ecotrack-a8cc2",
-    databaseURL: "https://ecotrack-a8cc2-default-rtdb.firebaseio.com",
     storageBucket: "ecotrack-a8cc2.firebasestorage.app",
     messagingSenderId: "972183035152",
-    appId: "1:972183035152:web:f41f1e1c7d673176f51995"
+    appId: "1:972183035152:web:f41f1e1c7d673176f51995",
+    measurementId: "G-W282276SN8"
 };
 
 const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
 const db = getDatabase(app);
-const sessionId = "session_" + Date.now(); // Unique ID for Firebase
+const sessionId = "session_" + Date.now();
 
 let totalBytes = 0;
-let intervalId;
+let intervalId = null;
 
+// ============================================================
+//  CORE: Update UI + call backend carbon API + sync Firebase
+// ============================================================
 async function updateUI(bytes) {
     try {
         const response = await fetch('/api/audit', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ bytes: bytes })
+            body: JSON.stringify({ bytes })
         });
-        
+
         const result = await response.json();
-        const carbonMg = parseFloat(result.carbonMg); 
+        const carbonMg = parseFloat(result.carbonMg);
         const mb = bytes / (1024 * 1024);
 
-        // 1. Update the Basic Values
+        // --- Update stat cards ---
         document.getElementById('data-val').innerText = mb.toFixed(2) + " MB";
-        document.getElementById('carbon-val').innerText = carbonMg + " mg CO₂";
+        document.getElementById('carbon-val').innerText = carbonMg.toFixed(2) + " mg";
 
-        // 2. Logic: System Status & CPU Pressure
+        // --- Status badge logic ---
         const badge = document.getElementById('status-badge');
-        const cpuElement = document.getElementById('cpu-val');
-        
-        if (carbonMg > 250) {
-            // CRITICAL STATE
-            badge.innerText = "System: CRITICAL";
-            badge.style.background = "#ff4444"; // Red
-            badge.style.color = "white";
-            
-            // Spike CPU to 85-99%
-            const spike = Math.floor(Math.random() * 15) + 85;
-            cpuElement.innerText = spike + "%";
-            cpuElement.style.color = "#ff4444";
-        } else {
-            // NOMINAL STATE
-            badge.innerText = "System: Nominal";
-            badge.style.background = "#00ff88"; // Green
-            badge.style.color = "black";
-            
-            // Normal CPU 12-25%
-            const normal = Math.floor(Math.random() * 13) + 12;
-            cpuElement.innerText = normal + "%";
-            cpuElement.style.color = "white";
+        const isCritical = carbonMg > 250;
+
+        badge.innerText = isCritical ? "System: CRITICAL" : "System: Nominal";
+        badge.style.background = isCritical ? "#ff4444" : "#00ff88";
+        badge.style.color = isCritical ? "white" : "black";
+
+        // --- CPU: simulation shows fake % only in sim mode ---
+        if (isSimulation) {
+            const cpuEl = document.getElementById('cpu-val');
+            if (isCritical) {
+                cpuEl.innerText = (Math.floor(Math.random() * 15) + 85) + "%";
+                cpuEl.style.color = "#ff4444";
+            } else {
+                cpuEl.innerText = (Math.floor(Math.random() * 13) + 12) + "%";
+                cpuEl.style.color = "white";
+            }
         }
 
-        // 3. Sync to Firebase
-        set(ref(db, 'live_audit/' + sessionId), {
+        // --- Firebase sync ---
+        await set(ref(db, 'live_audit/' + sessionId), {
             mb_transferred: mb.toFixed(2),
             carbon_mg: carbonMg,
-            status: carbonMg > 250 ? "CRITICAL" : "NOMINAL",
+            status: isCritical ? "CRITICAL" : "NOMINAL",
             timestamp: Date.now()
         });
 
     } catch (err) {
-        console.error("Vercel Function Error:", err);
-        document.getElementById('status-badge').innerText = "System: OFFLINE";
-        document.getElementById('status-badge').style.background = "gray";
+        console.error("updateUI error:", err);
     }
 }
 
+// ============================================================
+//  REAL MODE — PerformanceObserver (network) + PressureObserver (CPU)
+//  Only initialised when isSimulation === false
+// ============================================================
+if (!isSimulation) {
+    // -- Real network tracking --
+    try {
+        const netObserver = new PerformanceObserver((list) => {
+            list.getEntries().forEach((entry) => {
+                if (entry.transferSize > 0) {
+                    totalBytes += entry.transferSize;
+                    updateUI(totalBytes);
+                }
+            });
+        });
+        // buffered:true picks up resources loaded before observer attached
+        netObserver.observe({ type: "resource", buffered: true });
+    } catch (e) {
+        console.warn("PerformanceObserver not supported:", e);
+        document.getElementById('data-val').innerText = "Not supported";
+    }
+
+    // -- Real CPU pressure tracking --
+    if ('PressureObserver' in window) {
+        try {
+            const cpuObserver = new PressureObserver((records) => {
+                const state = records[0].state.toUpperCase(); // nominal | fair | serious | critical
+                const cpuEl = document.getElementById('cpu-val');
+                cpuEl.innerText = state;
+                cpuEl.style.color = (state === 'CRITICAL' || state === 'SERIOUS') ? "#ff4444" : "white";
+            });
+            cpuObserver.observe("cpu");
+        } catch (e) {
+            console.warn("PressureObserver failed:", e);
+            document.getElementById('cpu-val').innerText = "Unavailable";
+        }
+    } else {
+        document.getElementById('cpu-val').innerText = "Not supported";
+    }
+
+    // Hide simulation buttons in real mode
+    document.getElementById('start-btn').style.display = 'none';
+    document.getElementById('stop-btn').style.display = 'none';
+
+    // Set initial badge
+    document.getElementById('status-badge').innerText = "System: Live";
+}
+
+// ============================================================
+//  SIMULATION MODE — only available when isSimulation === true
+// ============================================================
 function startSimulation() {
-    if(intervalId) return;
-    document.getElementById('status-badge').innerText = "System: Processing...";
+    if (!isSimulation) return; // Guard: no-op in real mode
+    if (intervalId) return;    // Already running
+
+    document.getElementById('status-badge').innerText = "System: Simulating...";
+    document.getElementById('status-badge').style.background = "#00ff88";
+    document.getElementById('status-badge').style.color = "black";
+
     intervalId = setInterval(() => {
-        // Simulating data transfer via image load
         const img = new Image();
-        img.src = `https://picsum.photos/200/200?random=${Math.floor(Math.random()*10000)}`;
+        img.src = `https://picsum.photos/200/200?random=${Math.floor(Math.random() * 10000)}&t=${Date.now()}`;
         img.onload = () => {
-            totalBytes += (150 * 1024); // Adding 150KB per load
-            updateUI(totalBytes); // Pass the current bytes to the function
+            totalBytes += 150 * 1024; // ~150 KB per image load
+            updateUI(totalBytes);
         };
     }, 2000);
 }
 
 function stopSimulation() {
+    if (!isSimulation) return; // Guard: no-op in real mode
+    if (!intervalId) return;
+
     clearInterval(intervalId);
     intervalId = null;
+
     document.getElementById('status-badge').innerText = "System: Standby";
+    document.getElementById('status-badge').style.background = "#333";
+    document.getElementById('status-badge').style.color = "white";
 }
 
-document.getElementById("start-btn").onclick = startSimulation;
-document.getElementById("stop-btn").onclick = stopSimulation;
+// ============================================================
+//  Event listeners (buttons are hidden in real mode anyway)
+// ============================================================
+document.getElementById('start-btn').addEventListener('click', startSimulation);
+document.getElementById('stop-btn').addEventListener('click', stopSimulation);
