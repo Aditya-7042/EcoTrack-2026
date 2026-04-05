@@ -20,7 +20,6 @@ let intervalId;
 
 async function updateUI(bytes) {
     try {
-        // 1. Fetch calculation from your Node.js Backend (/api/audit.js)
         const response = await fetch('/api/audit', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -28,23 +27,51 @@ async function updateUI(bytes) {
         });
         
         const result = await response.json();
-        const carbonMg = result.carbonMg; 
+        const carbonMg = parseFloat(result.carbonMg); 
         const mb = bytes / (1024 * 1024);
 
-        // 2. Update the Screen
+        // 1. Update the Basic Values
         document.getElementById('data-val').innerText = mb.toFixed(2) + " MB";
         document.getElementById('carbon-val').innerText = carbonMg + " mg CO₂";
-        document.getElementById('status-badge').innerText = "System: Active";
+
+        // 2. Logic: System Status & CPU Pressure
+        const badge = document.getElementById('status-badge');
+        const cpuElement = document.getElementById('cpu-val');
+        
+        if (carbonMg > 250) {
+            // CRITICAL STATE
+            badge.innerText = "System: CRITICAL";
+            badge.style.background = "#ff4444"; // Red
+            badge.style.color = "white";
+            
+            // Spike CPU to 85-99%
+            const spike = Math.floor(Math.random() * 15) + 85;
+            cpuElement.innerText = spike + "%";
+            cpuElement.style.color = "#ff4444";
+        } else {
+            // NOMINAL STATE
+            badge.innerText = "System: Nominal";
+            badge.style.background = "#00ff88"; // Green
+            badge.style.color = "black";
+            
+            // Normal CPU 12-25%
+            const normal = Math.floor(Math.random() * 13) + 12;
+            cpuElement.innerText = normal + "%";
+            cpuElement.style.color = "white";
+        }
 
         // 3. Sync to Firebase
         set(ref(db, 'live_audit/' + sessionId), {
             mb_transferred: mb.toFixed(2),
             carbon_mg: carbonMg,
+            status: carbonMg > 250 ? "CRITICAL" : "NOMINAL",
             timestamp: Date.now()
         });
+
     } catch (err) {
         console.error("Vercel Function Error:", err);
-        document.getElementById('status-badge').innerText = "System: API Error";
+        document.getElementById('status-badge').innerText = "System: OFFLINE";
+        document.getElementById('status-badge').style.background = "gray";
     }
 }
 
