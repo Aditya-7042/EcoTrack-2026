@@ -7,7 +7,8 @@ import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/12.11.
 //  false → Real mode (Vercel deployed, PerformanceObserver)
 //  true  → Simulation mode (local dev, demo buttons)
 // ============================================================
-const isSimulation = true;
+const isSimulation = false
+    ;
 
 // --- Firebase Setup ---
 const firebaseConfig = {
