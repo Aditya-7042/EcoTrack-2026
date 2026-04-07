@@ -9,7 +9,8 @@ export default async function handler(req, res) {
     const timestamp = Date.now();
 
 // Handle missing API key gracefully - rotate through different suggestions
-    if (!process.env.ANTHROPIC_API_KEY) {
+    if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY.trim() === '') {
+        console.log("No ANTHROPIC_API_KEY found, using fallback suggestions");
         const suggestionSets = [
             [
                 "✓ Compress images and videos before upload",
@@ -36,9 +37,10 @@ export default async function handler(req, res) {
         // Rotate suggestions based on timestamp
         const setIndex = Math.floor(timestamp / 10000) % suggestionSets.length;
 
-        return res.status(500).json({
-            error: "AI service not configured",
-            suggestions: suggestionSets[setIndex]
+        return res.status(200).json({
+            success: false,
+            suggestions: suggestionSets[setIndex],
+            fallback: true
         });
     }
 
@@ -147,14 +149,17 @@ Provide 3 DIFFERENT, specific, actionable tips to REDUCE carbon production focus
     } catch (err) {
         console.error("Claude API error:", err);
         // Fallback suggestions if API fails
+        const fallbackSuggestions = [
+            "📊 Use WebP images instead of PNG/JPG (25-35% smaller)",
+            "🔄 Implement service workers for caching and offline support",
+            "📦 Enable gzip/brotli compression on your server"
+        ];
+
         res.status(200).json({
             success: false,
-            suggestions: [
-                "📊 Use WebP images instead of PNG/JPG (25-35% smaller)",
-                "🔄 Implement service workers for caching and offline support",
-                "📦 Enable gzip/brotli compression on your server"
-            ],
-            error: "Using default suggestions"
+            suggestions: fallbackSuggestions,
+            error: err.message,
+            fallback: true
         });
     }
 }
