@@ -5,20 +5,54 @@ export default async function handler(req, res) {
     }
 
     const { carbonMg, bytes, status } = req.body;
+    const mbTransferred = (bytes / (1024 * 1024)).toFixed(2);
+    const timestamp = Date.now();
 
-    // Handle missing API key gracefully
+// Handle missing API key gracefully - rotate through different suggestions
     if (!process.env.ANTHROPIC_API_KEY) {
-        return res.status(500).json({ 
-            error: "AI service not configured",
-            suggestions: [
+        const suggestionSets = [
+            [
                 "✓ Compress images and videos before upload",
                 "✓ Enable browser caching for static assets",
                 "✓ Use lazy loading for off-screen resources"
+            ],
+            [
+                "📊 Convert images to WebP format (25-35% smaller)",
+                "🔄 Implement service workers for offline caching",
+                "⚡ Minify CSS, JavaScript, and HTML files"
+            ],
+            [
+                "🌐 Use a Content Delivery Network (CDN)",
+                "📱 Optimize for mobile-first loading",
+                "🎯 Implement resource hints (preload, prefetch)"
+            ],
+            [
+                "🗜️ Enable gzip/brotli compression on server",
+                "📈 Use responsive images with srcset",
+                "⚡ Remove unused CSS and JavaScript"
             ]
+        ];
+
+        // Rotate suggestions based on timestamp
+        const setIndex = Math.floor(timestamp / 10000) % suggestionSets.length;
+
+        return res.status(500).json({
+            error: "AI service not configured",
+            suggestions: suggestionSets[setIndex]
         });
     }
 
     try {
+        // Determine focus area based on current metrics
+        let focusArea = "general optimization";
+        if (carbonMg > 500) {
+            focusArea = "high-impact data reduction";
+        } else if (mbTransferred > 10) {
+            focusArea = "resource loading optimization";
+        } else if (status === "CRITICAL") {
+            focusArea = "emergency carbon reduction";
+        }
+
         const response = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
             headers: {
@@ -31,21 +65,25 @@ export default async function handler(req, res) {
                 max_tokens: 300,
                 messages: [{
                     role: "user",
-                    content: `You are an eco-friendly web optimization expert. Based on these metrics:
+                    content: `You are an eco-friendly web optimization expert. Current session: ${timestamp}
+
+METRICS:
 - Carbon emissions: ${carbonMg}mg CO₂
-- Data transferred: ${(bytes / (1024 * 1024)).toFixed(2)}MB
+- Data transferred: ${mbTransferred}MB
 - Status: ${status}
+- Focus area: ${focusArea}
 
-Provide exactly 3 specific, actionable tips to REDUCE carbon production. Format as a JSON array of strings. Each tip should be practical and implementable immediately. Example format:
-["Tip 1 here", "Tip 2 here", "Tip 3 here"]
+Provide exactly 3 DIFFERENT, specific, actionable tips to REDUCE carbon production. Make each tip unique and focused on ${focusArea}. Format as a JSON array of strings.
 
-Focus on web performance, data optimization, and resource efficiency.`
+Example format: ["Tip 1 here", "Tip 2 here", "Tip 3 here"]
+
+Tips should be practical, implementable immediately, and vary based on the current metrics and focus area.`
                 }]
             })
         });
 
         const data = await response.json();
-        
+
         // Extract the text response
         let textContent = data.content[0].text;
         
