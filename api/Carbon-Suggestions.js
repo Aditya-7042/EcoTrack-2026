@@ -73,11 +73,11 @@ METRICS:
 - Status: ${status}
 - Focus area: ${focusArea}
 
-Provide exactly 3 DIFFERENT, specific, actionable tips to REDUCE carbon production. Make each tip unique and focused on ${focusArea}. Format as a JSON array of strings.
+IMPORTANT: Respond with ONLY a valid JSON array of exactly 3 strings. No other text, no markdown, no explanations.
 
-Example format: ["Tip 1 here", "Tip 2 here", "Tip 3 here"]
+Example: ["Compress all images using WebP format", "Enable browser caching headers", "Implement lazy loading for images"]
 
-Tips should be practical, implementable immediately, and vary based on the current metrics and focus area.`
+Provide 3 DIFFERENT, specific, actionable tips to REDUCE carbon production focused on ${focusArea}.`
                 }]
             })
         });
@@ -86,32 +86,68 @@ Tips should be practical, implementable immediately, and vary based on the curre
 
         // Extract the text response
         let textContent = data.content[0].text;
-        
-        // Try to parse JSON from the response
+        console.log("Claude raw response:", textContent);
+
+        // Try to parse JSON from the response - more robust parsing
         let suggestions = [];
         try {
-            // Find JSON array in the response
-            const jsonMatch = textContent.match(/\[[\s\S]*\]/);
+            // Clean the response text
+            textContent = textContent.trim();
+
+            // Look for JSON array pattern
+            const jsonMatch = textContent.match(/\[[\s\S]*?\]/);
+
             if (jsonMatch) {
-                suggestions = JSON.parse(jsonMatch[0]);
+                const jsonString = jsonMatch[0];
+                console.log("Found JSON match:", jsonString);
+
+                // Try to parse the JSON
+                suggestions = JSON.parse(jsonString);
+
+                // Ensure it's an array
+                if (!Array.isArray(suggestions)) {
+                    suggestions = [suggestions];
+                }
             } else {
-                suggestions = [textContent];
+                // No JSON found, split by newlines and clean up
+                console.log("No JSON found, using text fallback");
+                suggestions = textContent
+                    .split('\n')
+                    .map(line => line.trim())
+                    .filter(line => line.length > 0 && !line.startsWith('[') && !line.startsWith(']'))
+                    .slice(0, 3); // Take first 3 lines
             }
-        } catch (e) {
-            suggestions = [textContent];
+        } catch (parseError) {
+            console.error("JSON parse error:", parseError);
+            console.log("Falling back to text splitting");
+
+            // Fallback: split by newlines and clean
+            suggestions = textContent
+                .split('\n')
+                .map(line => line.trim().replace(/^[-•*]\s*/, '').replace(/^\d+\.\s*/, ''))
+                .filter(line => line.length > 0)
+                .slice(0, 3);
         }
 
-        res.status(200).json({ 
+        // Ensure we have exactly 3 suggestions
+        while (suggestions.length < 3) {
+            suggestions.push("Optimize resource loading and caching strategies");
+        }
+        suggestions = suggestions.slice(0, 3);
+
+        console.log("Final suggestions:", suggestions);
+
+        res.status(200).json({
             success: true,
             suggestions: suggestions,
             carbonMg: carbonMg,
-            mbTransferred: (bytes / (1024 * 1024)).toFixed(2)
+            mbTransferred: mbTransferred
         });
 
     } catch (err) {
         console.error("Claude API error:", err);
         // Fallback suggestions if API fails
-        res.status(200).json({ 
+        res.status(200).json({
             success: false,
             suggestions: [
                 "📊 Use WebP images instead of PNG/JPG (25-35% smaller)",
