@@ -5,9 +5,9 @@
   "type": "module",
   "main": "script.js",
   "scripts": {
-    "dev": "vercel dev",
-    "build": "vercel build",
-    "start": "vercel start"
+    "dev": "echo 'Use vercel dev to run locally'",
+    "build": "echo 'Build is handled by Vercel automatically'",
+    "start": "echo 'Start is handled by Vercel automatically'"
   },
   "keywords": [
     "carbon",
