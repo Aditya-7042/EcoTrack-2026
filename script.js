@@ -53,10 +53,19 @@ async function getCarbonSuggestions(bytes, carbonMg, status) {
             })
         });
 
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
         const result = await response.json();
         console.log("✅ Raw API Response:", result);
         console.log("✅ Suggestions array:", result.suggestions);
-        displaySuggestions(result.suggestions);
+
+        if (result.fallback) {
+            console.log("📝 Using fallback suggestions (API not configured)");
+        }
+
+        displaySuggestions(result.suggestions, result.fallback);
     } catch (err) {
         console.error("❌ Suggestions API error:", err);
         // Show default suggestions if API fails
@@ -65,14 +74,14 @@ async function getCarbonSuggestions(bytes, carbonMg, status) {
             "✓ Enable browser caching for static assets",
             "✓ Use lazy loading for off-screen resources"
         ];
-        displaySuggestions(fallbackSuggestions);
+        displaySuggestions(fallbackSuggestions, true);
     }
 }
 
 // ============================================================
 //  Display Suggestions in UI
 // ============================================================
-function displaySuggestions(suggestions) {
+function displaySuggestions(suggestions, isFallback = false) {
     const suggestionsList = document.getElementById('suggestions-list');
 
     if (!suggestionsList) {
@@ -97,12 +106,14 @@ function displaySuggestions(suggestions) {
     }
 
     const timestamp = new Date().toLocaleTimeString();
-    console.log(`🖼️ [${timestamp}] Displaying ${suggestions.length} suggestions:`, suggestions);
+    console.log(`🖼️ [${timestamp}] Displaying ${suggestions.length} suggestions (${isFallback ? 'fallback' : 'AI'}):`, suggestions);
+
+    const fallbackIndicator = isFallback ? ' <small style="color: #666; font-size: 0.8em;">(default)</small>' : '';
 
     suggestionsList.innerHTML = suggestions.map((suggestion, index) => `
         <div class="suggestion-item">
-            <span class="suggestion-icon">🌍</span>
-            <span class="suggestion-text">${suggestion}</span>
+            <span class="suggestion-icon">${isFallback ? '💡' : '🌍'}</span>
+            <span class="suggestion-text">${suggestion}${index === 0 ? fallbackIndicator : ''}</span>
         </div>
     `).join('');
 }
