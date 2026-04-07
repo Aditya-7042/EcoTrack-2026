@@ -59,7 +59,106 @@
             font-size: 1.5rem;
             font-weight: bold;
             margin: 10px 0;
-        }
+        }:root {
+    --bg: #050505;
+    --card: #111;
+    --green: #00ff88;
+    --red: #ff4444;
+}
+
+body {
+    background: var(--bg);
+    color: white;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    margin: 0;
+}
+
+.dashboard {
+    width: 100%;
+    max-width: 800px;
+    border: 1px solid #333;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+/* --- THE STATUS BADGE --- */
+#status-badge {
+    padding: 6px 12px;
+    border-radius: 3px;
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    transition: all 0.3s ease; /* Smooth color transitions */
+    background: var(--green); /* Default to Nominal */
+    color: #000;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.card {
+    background: var(--card);
+    padding: 15px;
+    border-radius: 4px;
+    border-bottom: 2px solid #333;
+    min-height: 100px;
+    transition: border-color 0.3s ease;
+}
+
+/* Logic helpers for JS */
+.card.accent { border-bottom-color: var(--green); }
+.card.critical-border { border-bottom-color: var(--red); }
+
+#data-val, #cpu-val, #carbon-val {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin: 10px 0;
+    transition: color 0.3s ease;
+}
+
+button {
+    margin-right: 10px;
+    margin-bottom: 10px;
+    padding: 10px 20px;
+    cursor: pointer;
+    border: none;
+    border-radius: 3px;
+    background: var(--green);
+    color: #000;
+    font-weight: bold;
+    transition: opacity 0.2s;
+}
+
+button:hover { opacity: 0.8; }
+button.stop { background: var(--red); color: #fff; }
+
+/* --- RESPONSIVE DESIGN --- */
+@media (max-width: 600px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    header h1 {
+        font-size: 1.5rem;
+    }
+    .dashboard {
+        padding: 15px;
+    }
+}
         button {
             margin-right: 10px;
             margin-bottom: 10px; /* Space between buttons when stacked */
