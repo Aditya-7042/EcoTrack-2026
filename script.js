@@ -4,8 +4,8 @@ import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/12.11.
 
 // ============================================================
 //  MASTER TOGGLE
-//  false → Real mode (Vercel deployed, PerformanceObserver)
-//  true  → Simulation mode (local dev, demo buttons)
+//  true  → Simulation mode (fake image loads, demo buttons work)
+//  false → Real mode      (PerformanceObserver + PressureObserver)
 // ============================================================
 const isSimulation = true;
 
@@ -27,7 +27,68 @@ const sessionId = "session_" + Date.now();
 
 let totalBytes = 0;
 let intervalId = null;
-let auditDone = false; // prevents repeated audit calls in real mode
+let lastSuggestionsCall = 0;
+const SUGGESTIONS_COOLDOWN = 5000; // Call AI suggestions every 5 seconds max
+
+// ============================================================
+//  AI: Get Carbon Reduction Suggestions
+// ============================================================
+async function getCarbonSuggestions(bytes, carbonMg, status) {
+    const now = Date.now();
+    // Rate limit: only call AI suggestions every 5 seconds
+    if (now - lastSuggestionsCall < SUGGESTIONS_COOLDOWN) return;
+    lastSuggestionsCall = now;
+
+    try {
+        console.log("📡 Fetching carbon suggestions...");
+        const response = await fetch('/api/carbon-suggestions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                bytes,
+                carbonMg,
+                status
+            })
+        });
+
+        const result = await response.json();
+        console.log("✅ API Response:", result);
+        displaySuggestions(result.suggestions);
+    } catch (err) {
+        console.error("❌ Suggestions API error:", err);
+        // Show default suggestions if API fails
+        displaySuggestions([
+            "✓ Compress images and videos before upload",
+            "✓ Enable browser caching for static assets",
+            "✓ Use lazy loading for off-screen resources"
+        ]);
+    }
+}
+
+// ============================================================
+//  Display Suggestions in UI
+// ============================================================
+function displaySuggestions(suggestions) {
+    const suggestionsList = document.getElementById('suggestions-list');
+    
+    if (!suggestionsList) {
+        console.warn("⚠️ suggestions-list element not found");
+        return;
+    }
+    
+    if (!Array.isArray(suggestions)) {
+        suggestions = [suggestions];
+    }
+
+    console.log("🖼️ Displaying suggestions:", suggestions);
+    
+    suggestionsList.innerHTML = suggestions.map((suggestion, index) => `
+        <div class="suggestion-item">
+            <span class="suggestion-icon">🌍</span>
+            <span class="suggestion-text">${suggestion}</span>
+        </div>
+    `).join('');
+}
 
 // ============================================================
 //  CORE: Update UI + call backend carbon API + sync Firebase
@@ -51,11 +112,12 @@ async function updateUI(bytes) {
         // --- Status badge logic ---
         const badge = document.getElementById('status-badge');
         const isCritical = carbonMg > 250;
+
         badge.innerText = isCritical ? "System: CRITICAL" : "System: Nominal";
         badge.style.background = isCritical ? "#ff4444" : "#00ff88";
         badge.style.color = isCritical ? "white" : "black";
 
-        // --- CPU: fake % only in sim mode ---
+        // --- CPU: simulation shows fake % only in sim mode ---
         if (isSimulation) {
             const cpuEl = document.getElementById('cpu-val');
             if (isCritical) {
@@ -75,36 +137,51 @@ async function updateUI(bytes) {
             timestamp: Date.now()
         });
 
+        // --- Get AI suggestions for carbon reduction ---
+        getCarbonSuggestions(bytes, carbonMg, isCritical ? "CRITICAL" : "NOMINAL");
+
     } catch (err) {
         console.error("updateUI error:", err);
     }
 }
 
 // ============================================================
-//  REAL MODE — only runs when isSimulation === false
+//  REAL MODE — PerformanceObserver (network) + PressureObserver (CPU)
+//  Only initialised when isSimulation === false
 // ============================================================
 if (!isSimulation) {
+    // -- Real network tracking --
+    try {
+    let debounceTimer = null;
 
-    // Hide simulation buttons
-    document.getElementById('start-btn').style.display = 'none';
-    document.getElementById('stop-btn').style.display = 'none';
+    const netObserver = new PerformanceObserver((list) => {
+        list.getEntries().forEach((entry) => {
+            if (entry.name.includes('/api/audit')) return;
+            if (entry.transferSize > 0) {
+                totalBytes += entry.transferSize;
+            }
+        });
 
-    // Set badge to Live
-    const badge = document.getElementById('status-badge');
-    badge.innerText = "System: Live";
-    badge.style.background = "#00ff88";
-    badge.style.color = "black";
+        // Wait 1 second after last resource before calling API
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            updateUI(totalBytes);
+        }, 1000);
+    });
+    netObserver.observe({ type: "resource", buffered: true });
+} catch (e) {
+    console.warn("PerformanceObserver not supported:", e);
+    document.getElementById('data-val').innerText = "Not supported";
+}
 
     // -- Real CPU pressure tracking --
     if ('PressureObserver' in window) {
         try {
             const cpuObserver = new PressureObserver((records) => {
-                const state = records[0].state.toUpperCase();
+                const state = records[0].state.toUpperCase(); // nominal | fair | serious | critical
                 const cpuEl = document.getElementById('cpu-val');
                 cpuEl.innerText = state;
-                cpuEl.style.color = (state === 'CRITICAL' || state === 'SERIOUS')
-                    ? "#ff4444"
-                    : "white";
+                cpuEl.style.color = (state === 'CRITICAL' || state === 'SERIOUS') ? "#ff4444" : "white";
             });
             cpuObserver.observe("cpu");
         } catch (e) {
@@ -115,51 +192,24 @@ if (!isSimulation) {
         document.getElementById('cpu-val').innerText = "Not supported";
     }
 
-    // -- Wait for page to fully load, then audit ONCE --
-    window.addEventListener('load', () => {
-        setTimeout(() => {
-            if (auditDone) return; // safety guard — never runs twice
-            auditDone = true;
+    // Hide simulation buttons in real mode
+    document.getElementById('start-btn').style.display = 'none';
+    document.getElementById('stop-btn').style.display = 'none';
 
-            // FIX: Use decodedBodySize as fallback when transferSize is 0
-            // transferSize = 0 means browser loaded from cache (304 Not Modified)
-            // decodedBodySize = actual size of the resource regardless of cache
-            const entries = performance.getEntriesByType("resource");
-            entries.forEach((entry) => {
-                if (entry.name.includes('/api/audit')) return;
-                const size = entry.transferSize > 0
-                    ? entry.transferSize      // fresh load — real wire bytes
-                    : entry.decodedBodySize;  // cached load — uncompressed size
-                if (size > 0) {
-                    totalBytes += size;
-                }
-            });
-
-            // Also include the main HTML document itself
-            const navEntry = performance.getEntriesByType("navigation")[0];
-            if (navEntry) {
-                const navSize = navEntry.transferSize > 0
-                    ? navEntry.transferSize
-                    : navEntry.decodedBodySize;
-                if (navSize > 0) totalBytes += navSize;
-            }
-
-            updateUI(totalBytes);
-        }, 1500);
-    });
+    // Set initial badge
+    document.getElementById('status-badge').innerText = "System: Live";
 }
 
 // ============================================================
-//  SIMULATION MODE — only runs when isSimulation === true
+//  SIMULATION MODE — only available when isSimulation === true
 // ============================================================
 function startSimulation() {
-    if (!isSimulation) return;
-    if (intervalId) return;
+    if (!isSimulation) return; // Guard: no-op in real mode
+    if (intervalId) return;    // Already running
 
-    const badge = document.getElementById('status-badge');
-    badge.innerText = "System: Simulating...";
-    badge.style.background = "#00ff88";
-    badge.style.color = "black";
+    document.getElementById('status-badge').innerText = "System: Simulating...";
+    document.getElementById('status-badge').style.background = "#00ff88";
+    document.getElementById('status-badge').style.color = "black";
 
     intervalId = setInterval(() => {
         const img = new Image();
@@ -172,20 +222,19 @@ function startSimulation() {
 }
 
 function stopSimulation() {
-    if (!isSimulation) return;
+    if (!isSimulation) return; // Guard: no-op in real mode
     if (!intervalId) return;
 
     clearInterval(intervalId);
     intervalId = null;
 
-    const badge = document.getElementById('status-badge');
-    badge.innerText = "System: Standby";
-    badge.style.background = "#333";
-    badge.style.color = "white";
+    document.getElementById('status-badge').innerText = "System: Standby";
+    document.getElementById('status-badge').style.background = "#333";
+    document.getElementById('status-badge').style.color = "white";
 }
 
 // ============================================================
-//  Button listeners (hidden in real mode anyway)
+//  Event listeners (buttons are hidden in real mode anyway)
 // ============================================================
 document.getElementById('start-btn').addEventListener('click', startSimulation);
 document.getElementById('stop-btn').addEventListener('click', stopSimulation);
