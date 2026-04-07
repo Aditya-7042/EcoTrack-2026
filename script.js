@@ -7,7 +7,7 @@ import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/12.11.
 //  true  → Simulation mode (fake image loads, demo buttons work)
 //  false → Real mode      (PerformanceObserver + PressureObserver)
 // ============================================================
-const isSimulation = false;
+const isSimulation = true;
 
 // --- Firebase Setup ---
 const firebaseConfig = {
@@ -40,11 +40,13 @@ async function getCarbonSuggestions(bytes, carbonMg, status) {
     lastSuggestionsCall = now;
 
     try {
-        console.log("📡 Fetching carbon suggestions...");
+        console.log(`📡 [${new Date().toLocaleTimeString()}] Fetching AI suggestions...`);
+        console.log(`   📊 Carbon: ${carbonMg}mg, Data: ${(bytes / (1024 * 1024)).toFixed(2)}MB, Status: ${status}`);
+
         const response = await fetch('/api/carbon-suggestions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
+            body: JSON.stringify({
                 bytes,
                 carbonMg,
                 status
@@ -52,16 +54,17 @@ async function getCarbonSuggestions(bytes, carbonMg, status) {
         });
 
         const result = await response.json();
-        console.log("✅ API Response:", result);
+        console.log("✅ AI Response:", result.suggestions);
         displaySuggestions(result.suggestions);
     } catch (err) {
         console.error("❌ Suggestions API error:", err);
         // Show default suggestions if API fails
-        displaySuggestions([
+        const fallbackSuggestions = [
             "✓ Compress images and videos before upload",
             "✓ Enable browser caching for static assets",
             "✓ Use lazy loading for off-screen resources"
-        ]);
+        ];
+        displaySuggestions(fallbackSuggestions);
     }
 }
 
@@ -70,18 +73,19 @@ async function getCarbonSuggestions(bytes, carbonMg, status) {
 // ============================================================
 function displaySuggestions(suggestions) {
     const suggestionsList = document.getElementById('suggestions-list');
-    
+
     if (!suggestionsList) {
         console.warn("⚠️ suggestions-list element not found");
         return;
     }
-    
+
     if (!Array.isArray(suggestions)) {
         suggestions = [suggestions];
     }
 
-    console.log("🖼️ Displaying suggestions:", suggestions);
-    
+    const timestamp = new Date().toLocaleTimeString();
+    console.log(`🖼️ [${timestamp}] Displaying ${suggestions.length} suggestions:`, suggestions);
+
     suggestionsList.innerHTML = suggestions.map((suggestion, index) => `
         <div class="suggestion-item">
             <span class="suggestion-icon">🌍</span>
