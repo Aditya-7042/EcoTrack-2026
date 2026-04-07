@@ -1,7 +1,5 @@
 {
   "name": "ecotrack",
   "version": "1.0.0",
-  "description": "EcoTrack - Carbon Auditor with AI Suggestions",
-  "type": "module",
-  "main": "script.js"
+  "type": "module"
 }
