@@ -3,19 +3,5 @@
   "version": "1.0.0",
   "description": "EcoTrack - Carbon Auditor with AI Suggestions",
   "type": "module",
-  "main": "script.js",
-  "scripts": {
-    "dev": "echo 'Use vercel dev to run locally'",
-    "build": "echo 'Build is handled by Vercel automatically'",
-    "start": "echo 'Start is handled by Vercel automatically'"
-  },
-  "keywords": [
-    "carbon",
-    "eco",
-    "audit",
-    "sustainability",
-    "ai"
-  ],
-  "author": "",
-  "license": "MIT"
+  "main": "script.js"
 }
