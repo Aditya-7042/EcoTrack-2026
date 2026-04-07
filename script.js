@@ -54,7 +54,8 @@ async function getCarbonSuggestions(bytes, carbonMg, status) {
         });
 
         const result = await response.json();
-        console.log("✅ AI Response:", result.suggestions);
+        console.log("✅ Raw API Response:", result);
+        console.log("✅ Suggestions array:", result.suggestions);
         displaySuggestions(result.suggestions);
     } catch (err) {
         console.error("❌ Suggestions API error:", err);
@@ -80,7 +81,19 @@ function displaySuggestions(suggestions) {
     }
 
     if (!Array.isArray(suggestions)) {
-        suggestions = [suggestions];
+        console.warn("⚠️ suggestions is not an array:", suggestions);
+        suggestions = [suggestions || "Optimize resource loading strategies"];
+    }
+
+    // Clean and validate suggestions
+    suggestions = suggestions
+        .filter(s => s && typeof s === 'string' && s.trim().length > 0)
+        .map(s => s.trim())
+        .slice(0, 3); // Ensure max 3 suggestions
+
+    // Add default if empty
+    if (suggestions.length === 0) {
+        suggestions = ["Enable browser caching for static assets"];
     }
 
     const timestamp = new Date().toLocaleTimeString();
