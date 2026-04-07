@@ -7,7 +7,7 @@ import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/12.11.
 //  true  → Simulation mode (fake image loads, demo buttons work)
 //  false → Real mode      (PerformanceObserver + PressureObserver)
 // ============================================================
-const isSimulation = true;
+const isSimulation = false;
 
 // --- Firebase Setup ---
 const firebaseConfig = {
