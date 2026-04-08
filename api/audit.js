@@ -1,71 +1,50 @@
-// ============================================================
-//  EcoTrack API — /api/audit.js
-//  Vercel Serverless Function (Node.js 20.x)
-//  Calculates carbon footprint from bytes transferred
-// ============================================================
-
+// This is your Node.js Backend logic running on Vercel
 export default function handler(req, res) {
+    if (req.method === 'POST') {
+        const { bytes } = req.body;
 
-    // CORS headers — allow requests from any origin
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        // Strict validation
+        if (typeof bytes !== 'number' || bytes < 0 || !isFinite(bytes)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid bytes: must be a non-negative number'
+            });
+        }
 
-    // Handle preflight
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+        // Backend Constants for EcoTrack
+        const KWH_PER_GB = 0.06;
+        const CARBON_INTENSITY = 475; // g CO2/kWh
+
+        // Calculate carbon impact
+        const gb = bytes / (1024 ** 3);
+        const kwh = gb * KWH_PER_GB;
+        const carbonG = kwh * CARBON_INTENSITY;
+        const carbonMg = carbonG * 1000;
+
+        // Return detailed response
+        res.status(200).json({
+            success: true,
+            carbonMg: Number(carbonMg.toFixed(2)),
+            carbonG: Number(carbonG.toFixed(2)),
+            energyKwh: Number(kwh.toFixed(4)),
+            dataGb: Number(gb.toFixed(4)),
+            timestamp: Date.now(),
+            runtime: "Vercel Node.js 20.x"
+        });
+    } else if (req.method === 'GET') {
+        // Info endpoint
+        res.status(200).json({
+            message: "EcoTrack Carbon Audit API",
+            endpoints: {
+                POST: "/api/audit - Calculate carbon impact from bytes",
+                GET: "/api/audit - API info"
+            },
+            constants: {
+                KWH_PER_GB: 0.06,
+                CARBON_INTENSITY: 475
+            }
+        });
+    } else {
+        res.status(405).json({ message: "Method not allowed. Use POST or GET." });
     }
-
-    if (req.method !== 'POST') {
-        return res.status(405).json({ message: "Only POST allowed" });
-    }
-
-    const { bytes, resourceCount } = req.body;
-
-    // Validate input
-    const inputBytes = parseFloat(bytes) || 0;
-
-    // ── Carbon Calculation Constants ──
-    // Source: Website Carbon Calculator methodology (websitecarbon.com)
-    const KWH_PER_GB = 0.06;        // kWh consumed per GB of data transfer
-    const CARBON_INTENSITY = 475;    // gCO₂ per kWh (global average grid)
-    const RETURN_VISITOR_RATE = 0.5; // 50% of visitors are returning (use cache)
-
-    // ── Core formula ──
-    const gb = inputBytes / (1024 * 1024 * 1024);
-    const energyKwh = gb * KWH_PER_GB;
-    const carbonG = energyKwh * CARBON_INTENSITY;
-    const carbonMg = (carbonG * 1000).toFixed(2);
-
-    // ── Green rating ──
-    const carbonMgNum = parseFloat(carbonMg);
-    let rating = 'A+';
-    if (carbonMgNum > 300) rating = 'F';
-    else if (carbonMgNum > 200) rating = 'D';
-    else if (carbonMgNum > 100) rating = 'C';
-    else if (carbonMgNum > 50)  rating = 'B';
-    else if (carbonMgNum > 10)  rating = 'A';
-
-    // ── Per-visit comparisons ──
-    const dailyVisits1k = carbonMgNum * 1000; // mg for 1000 visits
-    const annualG = (carbonMgNum * 365 * 1000) / 1000; // grams per year for 1k daily visitors
-
-    return res.status(200).json({
-        success: true,
-        carbonMg,
-        rating,
-        energyKwh: energyKwh.toFixed(8),
-        gb: gb.toFixed(8),
-        resourceCount: resourceCount || null,
-        comparisons: {
-            daily1kVisitsMg: dailyVisits1k.toFixed(2),
-            annual1kVisitsG: annualG.toFixed(4),
-        },
-        constants: {
-            KWH_PER_GB,
-            CARBON_INTENSITY,
-        },
-        runtime: "Vercel Node.js 20.x",
-        timestamp: Date.now()
-    });
 }
