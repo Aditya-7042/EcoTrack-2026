@@ -7,7 +7,7 @@ import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/12.11.
 //  true  ? Simulation mode (fake image loads, demo buttons work)
 //  false ? Real mode      (PerformanceObserver + PressureObserver)
 // ============================================================
-const isSimulation = true;
+const isSimulation = false;
 
 // --- Firebase Setup ---
 const firebaseConfig = {
@@ -69,17 +69,47 @@ function addMessage(message, isUser = false) {
 
 function getAIResponse(userMessage, carbonMg) {
     const lowerMsg = userMessage.toLowerCase();
-    if (lowerMsg.includes('high') || lowerMsg.includes('reduce')) {
-        if (carbonMg > 250) {
-            return "Your carbon impact is high. Consider optimizing network usage, using energy-efficient devices, or reducing data transfer.";
-        } else {
-            return "Your carbon impact is within acceptable limits. Keep monitoring and aim for sustainable practices.";
-        }
+    const isHigh = carbonMg > 250;
+
+    if (lowerMsg.includes('high') || lowerMsg.includes('reduce') || lowerMsg.includes('lower')) {
+        return `Your current carbon impact is ${carbonMg.toFixed(2)} mg CO₂. To reduce it:
+• Optimize images and videos (compress, lazy load)
+• Use efficient data formats (WebP, AVIF)
+• Minimize unnecessary network requests
+• Enable browser caching and CDNs
+• Switch to energy-efficient hardware
+• Reduce video streaming quality when possible`;
     }
-    if (lowerMsg.includes('cpu')) {
-        return "CPU pressure affects energy consumption. High pressure indicates potential optimization opportunities.";
+    if (lowerMsg.includes('cpu') || lowerMsg.includes('pressure')) {
+        return `CPU pressure affects energy use. Tips to reduce:
+• Close unused browser tabs
+• Use lightweight apps and extensions
+• Enable hardware acceleration in browsers
+• Update to latest software for efficiency
+• Avoid running multiple heavy applications simultaneously`;
     }
-    return "I'm here to help with your carbon footprint insights. Ask me about reducing emissions or understanding your data!";
+    if (lowerMsg.includes('network') || lowerMsg.includes('data')) {
+        return `Network usage drives carbon impact. Optimization tips:
+• Use ad blockers to reduce ad-related data
+• Enable data compression in browsers
+• Prefer offline work when possible
+• Use local caching for repeated content
+• Choose eco-friendly hosting providers`;
+    }
+    if (lowerMsg.includes('energy') || lowerMsg.includes('efficient')) {
+        return `Energy efficiency reduces carbon footprint:
+• Use devices with Energy Star certification
+• Enable power-saving modes
+• Unplug unused electronics
+• Use renewable energy sources when available
+• Optimize code for better performance`;
+    }
+
+    if (isHigh) {
+        return `Your carbon impact (${carbonMg.toFixed(2)} mg CO₂) is elevated. Focus on reducing data transfer and optimizing CPU usage. Ask me about specific strategies!`;
+    } else {
+        return `Your carbon impact (${carbonMg.toFixed(2)} mg CO₂) is within good range. Keep monitoring and consider these preventive tips. What would you like to know more about?`;
+    }
 }
 
 sendBtn.addEventListener('click', () => {
