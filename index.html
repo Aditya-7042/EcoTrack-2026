@@ -1,129 +1,54 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>EcoTrack 2026 | AI Carbon Auditor</title>
-<link rel="stylesheet" href="style.css">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta charset="UTF-8">
+    <title>EcoTrack 2026 | Carbon Auditor</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
+    <div class="dashboard">
+        <header>
+            <h1>EcoTrack <span>v1.0</span></h1>
+            <div id="status-badge">System: Nominal</div>
+        </header>
 
-<div class="scan-line"></div>
+        <section class="stats-grid">
+            <div class="card">
+                <h3>Data Transferred</h3>
+                <p id="data-val">0.00 MB</p>
+            </div>
+            <div class="card">
+                <h3>CPU Pressure</h3>
+                <p id="cpu-val">Checking...</p>
+            </div>
+            <div class="card accent">
+                <h3>Est. Carbon Impact</h3>
+                <p id="carbon-val">0.00 mg CO2</p>
+            </div>
+        </section>
 
-<div class="dashboard">
+        <section class="chart-section">
+            <h3>Carbon Trend</h3>
+            <canvas id="carbonChart"></canvas>
+        </section>
 
-  <!-- HEADER -->
-  <header>
-    <div class="logo-block">
-      <h1>ECO<span>TRACK</span></h1>
-      <p class="tagline">AI Carbon Auditor · v2.0</p>
-    </div>
-    <div class="header-right">
-      <div id="status-badge">● LIVE</div>
-      <div class="session-info">Session: <span id="session-label">—</span></div>
-    </div>
-  </header>
+        <div class="controls">
+            <button id="start-btn">Start Simulation</button>
+            <button id="stop-btn" class="stop">Stop Simulation</button>
+        </div>
 
-  <!-- STATS GRID -->
-  <section class="stats-grid">
-    <div class="card" id="card-data">
-      <div class="card-icon">⬇</div>
-      <div class="card-label">Data Transferred</div>
-      <div class="card-value" id="data-val">0.00 MB</div>
-      <div class="card-sub" id="data-sub">Measuring page resources...</div>
-    </div>
-
-    <div class="card" id="card-cpu">
-      <div class="card-icon">⚡</div>
-      <div class="card-label">CPU Pressure</div>
-      <div class="card-value" id="cpu-val">Checking...</div>
-      <div class="card-sub" id="cpu-sub">Hardware state</div>
-    </div>
-
-    <div class="card accent" id="card-carbon">
-      <div class="card-icon">🌿</div>
-      <div class="card-label">Est. Carbon Impact</div>
-      <div class="card-value" id="carbon-val">0.00 mg</div>
-      <div class="card-sub" id="carbon-sub">CO₂ equivalent</div>
-    </div>
-
-    <div class="card" id="card-rating">
-      <div class="card-icon">★</div>
-      <div class="card-label">Green Rating</div>
-      <div class="card-value" id="rating-val">—</div>
-      <div class="card-sub" id="rating-sub">Page efficiency score</div>
+        <section class="ai-chat">
+            <h3>AI Assistant</h3>
+            <div id="chat-messages"></div>
+            <div class="chat-input">
+                <input type="text" id="chat-input" placeholder="Ask about your carbon footprint...">
+                <button id="send-btn">Send</button>
+            </div>
+        </section>
     </div>
 
-    <div class="card" id="card-equiv">
-      <div class="card-icon">🔋</div>
-      <div class="card-label">Equivalent To</div>
-      <div class="card-value" id="equiv-val">—</div>
-      <div class="card-sub">Real-world comparison</div>
-    </div>
-
-    <div class="card" id="card-visits">
-      <div class="card-icon">👥</div>
-      <div class="card-label">1K Visits/day CO₂</div>
-      <div class="card-value" id="visits-val">—</div>
-      <div class="card-sub">Estimated daily impact</div>
-    </div>
-  </section>
-
-  <!-- HISTORY GRAPH -->
-  <section class="history-section">
-    <div class="section-header">
-      <span class="section-title">Carbon History</span>
-      <span class="section-sub" id="history-count">0 sessions recorded</span>
-    </div>
-    <div class="graph-wrap">
-      <canvas id="history-chart"></canvas>
-      <div id="graph-empty" class="graph-empty">No history yet — data appears after first audit</div>
-    </div>
-  </section>
-
-  <!-- AI ADVISOR -->
-  <section class="ai-section">
-    <div class="section-header">
-      <span class="section-title">⬡ AI Carbon Advisor</span>
-      <span class="ai-badge">Powered by Claude</span>
-    </div>
-
-    <div id="ai-advisor-box" class="ai-box">
-      <div class="ai-placeholder">
-        <div class="ai-pulse"></div>
-        <p>AI analysis will appear here after your page audit completes...</p>
-      </div>
-    </div>
-
-    <!-- AI CHAT -->
-    <div class="chat-section">
-      <div class="section-header" style="margin-top:20px;">
-        <span class="section-title">💬 Ask the AI</span>
-      </div>
-      <div id="chat-log" class="chat-log"></div>
-      <div class="chat-input-row">
-        <input type="text" id="chat-input" placeholder="Ask anything about your carbon impact..." />
-        <button id="chat-send-btn" onclick="sendChat()">Send</button>
-      </div>
-      <div class="chat-suggestions">
-        <button class="suggestion-btn" onclick="sendSuggestion('How can I reduce my page carbon impact?')">How to reduce?</button>
-        <button class="suggestion-btn" onclick="sendSuggestion('What is causing the most emissions on my page?')">Main cause?</button>
-        <button class="suggestion-btn" onclick="sendSuggestion('How does my score compare to average websites?')">Compare scores</button>
-        <button class="suggestion-btn" onclick="sendSuggestion('Give me 5 tips to make my website greener')">Green tips</button>
-      </div>
-    </div>
-  </section>
-
-  <!-- SIMULATION BUTTONS (hidden in real mode) -->
-  <div id="sim-controls" style="margin-top:20px;">
-    <button id="start-btn">▶ Start Simulation</button>
-    <button id="stop-btn" class="stop">■ Stop Simulation</button>
-  </div>
-
-</div>
-
-<script type="module" src="script.js"></script>
+    <script type="module" src="script.js"></script>
 </body>
 </html>
